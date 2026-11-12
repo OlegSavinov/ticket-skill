@@ -1,6 +1,7 @@
 # /ticket state CLI. Run from the repo root.
 #   init                      create .claude/ticket/, exclude it from git locally
 #   start KEY [--force]       begin a ticket (activates hooks)
+#   gate NAME                 set current gate (assumptions, plan, diff)
 #   event agent|human SOURCE TEXT   log a caught error
 #   close                     write metrics to log.yml, deactivate hooks
 #   bug KEY TEXT              add a post-merge bug (human-caught) to KEY
@@ -60,6 +61,12 @@ when "event"
   abort "no active ticket" unless File.exist?(STATE)
   H.log_event(ROOT, kind, source, text)
   puts "logged #{kind}/#{source}"
+when "gate"
+  name = ARGV.shift or abort "usage: gate NAME (e.g., assumptions, plan, diff)"
+  state = H.read_json(STATE, nil) or abort "no active ticket"
+  state["current_gate"] = name
+  H.write_json(STATE, state)
+  puts "gate: #{name}"
 when "close"
   state = H.read_json(STATE, nil) or abort "no active ticket"
   ev = events

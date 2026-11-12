@@ -23,7 +23,7 @@ Files in `.claude/ticket/` (git-excluded locally, never committed):
   seen: [PROJ-101, PROJ-133]
   status: active            # active | enforced | retired
   enforced_by: ""           # checks.yml id when enforced
-  retired_reason: ""
+  retired_reason: ""        # when retired, explain why (e.g., "merged into L-XXX")
 ```
 
 ## Check schema (`checks.yml`)
@@ -52,43 +52,65 @@ a lesson, or propose a spec for the user to commit later.
 
 ## Retro
 
-1. **Gather.** Read `.claude/ticket/run.jsonl`. Human events are the main input. Lasting
-   domain facts from the gate 1 answers count too. Agent events matter when one kind
-   repeats (the same cop 3+ times means a style lesson).
-2. **Write each lesson** in one line: specific and actionable, naming the real files and
-   symbols. Pick a cause and add a one-line `cause_note`. The user confirms the cause:
-   your own diagnosis can be a plausible story rather than the truth.
-3. **Dedupe** against `lessons.yml`, all statuses. Same lesson: add the ticket to `seen`,
-   don't add a new entry. A retired lesson coming back: reactivate it and say it was
-   retired too early.
-4. **Promote**:
-   - `ignored_instruction`: propose a check now.
-   - `seen` has 2+ tickets and the lesson works as a line regex: propose a check.
-   - The same cause on 3+ different active lessons: propose a change to that stage of
-     `SKILL.md` or `references/rails.md` (`spec_gap`: to the user's ticket template),
-     and retire the lessons it covers.
-   - Not checkable: keep it as a lesson. If seen 2+ times, make the wording firmer.
-   - Repo-specific facts go in the ledger. Process fixes that apply to any repo go in
-     the skill files.
-5. **Propose once**: one message with the YAML for new and changed entries, each check,
-   skill edits as diffs, and template notes. Change nothing until the user approves.
-6. **Apply** what's approved. A promoted lesson gets `status: enforced`, `fix: check` and
-   `enforced_by: <id>`. Test each new check: it must flag the bad line from this ticket and
-   not flag the fixed code.
+1. **Gather.** Read `run.jsonl`. Human events are primary. Lasting domain facts from gate 1
+   count. Agent events matter when one kind repeats 3+ times.
+
+2. **Write lessons.** One line each: specific, actionable, naming files/symbols. Pick a
+   cause from the table; add a one-line `cause_note`. User confirms the cause.
+
+3. **Group** against all lessons in `lessons.yml`.
+   - Similar lessons → merge. Extract the common principle in minimum words.
+   - Instruct what to do, not what to avoid.
+   - Prefer one broad principle over two narrow rules.
+
+4. **Graduate** (in preference order):
+   - **Skill instruction**: "What guideline would have prevented this?" → edit Working
+     Style, a stage, or the subagent brief. Retire the lesson.
+   - **Check**: `ignored_instruction`, or seen 2+ times and works as line regex.
+   - **references/rails.md**: repeated `explore_miss`.
+   - **Keep as lesson**: repo-specific facts only.
+
+5. **Propose once.** Skill diffs, checks, ledger changes. Apply only what's approved.
+   Graduated lessons get `status: retired`, `retired_reason: "graduated to <location>"`.
 
 ## Prune
 
-1. `L stale` lists lessons whose refs no longer exist. Propose retiring them, or updating
-   the refs if the code moved (ask which).
-2. Enforced lessons: confirm their check still exists in `checks.yml`.
-3. Duplicates or conflicts: merge them, or ask which one wins.
-4. More than 40 active lessons: merge or retire until under 40.
-5. Not seen in the last 20 tickets: flag for the user to review, but never retire on age
-   alone. No repeat corrections can mean the lesson works.
-6. `L score`: report the trend. If the rolling average isn't falling over 10–20 tickets,
-   say the loop isn't working and name the cause behind most human events.
-7. Propose one diff and apply what's approved. Retired lessons stay in the file with
-   `status: retired` and a `retired_reason`.
+Graduate lessons into skill instructions. A lesson means the skill was incomplete — prune
+fixes the skill and retires the lesson.
+
+### The graduation question
+
+For each active lesson: **"What instruction would have prevented this?"**
+
+| Answer points to... | Action |
+|---|---|
+| Working Style, a stage, subagent brief | Add instruction, retire lesson |
+| references/rails.md | Add method, retire lesson |
+| A line-regex check | Create check, retire lesson |
+| Nothing generalizable | Keep as lesson |
+
+### Workflow
+
+1. `L score` — if rolling average isn't falling over 10+ tickets, name the dominant cause
+   before continuing.
+2. Walk each active lesson through the graduation question. Group lessons pointing to the
+   same missing instruction. Propose skill diffs.
+3. Merge duplicates — same teaching, different words.
+4. `L stale` — refs that no longer exist. Ask: delete or update?
+5. Over 30 active after graduation? Flag candidates to merge or sharpen.
+6. Propose once. Apply what's approved.
+
+### What stays
+
+- Repo-specific facts that can't generalize
+- New lessons not yet seen twice
+- Lessons user chose to keep as reminders
+
+Retired lessons stay with `status: retired` and `retired_reason` — the audit trail.
+
+### Trigger
+
+Every 10–20 tickets, when active > 30, or when one cause appears 3+ times recently.
 
 ## Later: when you start committing
 Active lessons become `CLAUDE.md` lines (per area folder), and checks become RuboCop
