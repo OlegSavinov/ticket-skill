@@ -9,6 +9,7 @@ module TicketHooks
   MAX_STOP_BLOCKS = 3
   AGENT_WEIGHT = 0.1
   HUMAN_WEIGHT = 1.0
+  REVIEW_WEIGHT = 2.0
 
   module_function
 
@@ -126,14 +127,15 @@ module TicketHooks
 
   # --- scoring ----------------------------------------------------------------
 
-  def score(agent, human)
-    (agent * AGENT_WEIGHT + human * HUMAN_WEIGHT).round(2)
+  def score(agent, human, review = 0)
+    (agent * AGENT_WEIGHT + human * HUMAN_WEIGHT + review * REVIEW_WEIGHT).round(2)
   end
 
   def summarize(events)
     agent = events.count { |e| e["kind"] == "agent" }
     human = events.count { |e| e["kind"] == "human" }
-    { "agent" => agent, "human" => human, "score" => score(agent, human) }
+    review = events.count { |e| e["kind"] == "review" }
+    { "agent" => agent, "human" => human, "review" => review, "score" => score(agent, human, review) }
   end
 
   def rolling(scores, n = 10)

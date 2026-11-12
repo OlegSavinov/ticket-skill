@@ -2,7 +2,7 @@
 #   init                      create .claude/ticket/, exclude it from git locally
 #   start KEY [--force]       begin a ticket (activates hooks)
 #   gate NAME                 set current gate (assumptions, plan, diff)
-#   event agent|human SOURCE TEXT   log a caught error
+#   event agent|human|review SOURCE TEXT   log a caught error
 #   close                     write metrics to log.yml, deactivate hooks
 #   bug KEY TEXT              add a post-merge bug (human-caught) to KEY
 #   score                     last 10 tickets + rolling average
@@ -25,7 +25,7 @@ def events
 end
 
 def print_scores(log)
-  log.last(10).each { |e| puts format("%-14s agent %2d  human %2d  score %5.1f", e["ticket"], e["agent"], e["human"], e["score"]) }
+  log.last(10).each { |e| puts format("%-14s agent %2d  human %2d  review %2d  score %5.1f", e["ticket"], e["agent"], e["human"], e["review"] || 0, e["score"]) }
   puts "rolling avg (last 10): #{H.rolling(log.map { |e| e['score'] }) || 'n/a'}"
 end
 
@@ -57,7 +57,7 @@ when "start"
   puts "started #{key}, base #{base[0, 12]}#{snapshot.empty? ? '' : ' (snapshot of your uncommitted work)'}"
 when "event"
   kind, source, text = ARGV
-  abort "usage: event agent|human SOURCE TEXT" unless %w[agent human].include?(kind) && source && text
+  abort "usage: event agent|human|review SOURCE TEXT" unless %w[agent human review].include?(kind) && source && text
   abort "no active ticket" unless File.exist?(STATE)
   H.log_event(ROOT, kind, source, text)
   puts "logged #{kind}/#{source}"
@@ -72,13 +72,14 @@ when "close"
   ev = events
   entry = { "ticket" => state["ticket"], "closed" => Time.now.utc.iso8601 }.merge(H.summarize(ev))
   entry["human_events"] = ev.select { |e| e["kind"] == "human" }.map { |e| "#{e['source']}: #{e['text']}" }
+  entry["review_events"] = ev.select { |e| e["kind"] == "review" }.map { |e| "#{e['source']}: #{e['text']}" }
   entry["agent_by_source"] = ev.select { |e| e["kind"] == "agent" }.group_by { |e| e["source"] }
                                .map { |k, v| [k, v.size] }.to_h
   log = H.read_yaml(LOG, []) << entry
   H.write_yaml(LOG, log)
   File.delete(STATE)
   File.delete(RUN) if File.exist?(RUN)
-  puts "closed #{entry['ticket']}: agent #{entry['agent']}, human #{entry['human']}, score #{entry['score']}"
+  puts "closed #{entry['ticket']}: agent #{entry['agent']}, human #{entry['human']}, review #{entry['review']}, score #{entry['score']}"
   print_scores(log)
 when "bug"
   key = ARGV.shift

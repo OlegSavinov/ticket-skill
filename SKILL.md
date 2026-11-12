@@ -4,9 +4,9 @@ description: >
   Run a ticket end to end in a Rails repo with three human gates and a learning loop:
   explore, assumptions and questions, plan, failing specs first, implement, self-review,
   diff review, then a retro that teaches the flow through a per-repo lesson ledger.
-  Subcommands: bug. For retro/prune, load references/retro.md or references/prune.md.
+  Subcommands: bug. For retro/prune/defend, load the corresponding reference file.
 disable-model-invocation: true
-argument-hint: "<JIRA-KEY | pasted ticket> | bug <KEY> <what broke>"
+argument-hint: "<JIRA-KEY | pasted ticket> | bug <KEY> <what broke> | defend [<KEY>]"
 allowed-tools: Bash(ruby ${CLAUDE_SKILL_DIR}/scripts/*), Write, Edit, MultiEdit
 hooks:
   PostToolUse:
@@ -32,10 +32,11 @@ hooks:
 Arguments: `$ARGUMENTS`
 
 - `bug <KEY> <text>` → Bug.
+- `defend [<KEY>]` → Defend PR (load `references/defend.md`).
 - Anything else is a ticket (Jira key or pasted text): run stages 0–8 in order.
 
-For standalone retro or prune, load the reference files `references/retro.md` or
-`references/prune.md` on demand.
+For standalone retro, prune, or defend, load the reference files `references/retro.md`,
+`references/prune.md`, or `references/defend.md` on demand.
 
 `L` below means `ruby ${CLAUDE_SKILL_DIR}/scripts/ledger.rb`, run from the repo root.
 State lives in `.claude/ticket/` (git-excluded locally). One session per ticket: the hooks
@@ -66,6 +67,7 @@ Applies to every stage and goes, condensed, into every subagent brief.
   security, or anything the ticket asks for.
 - Never commit, push or rewrite git history. Confirm before anything destructive.
 - Always run `git commit` as a standalone command, never chained with other tool calls in the same response. Only commit once the code is verified safe and all edits are complete — hooks must run cleanly on the final state, not on a partially-modified file.
+- Never launch a command that touches the DB while a previous one is still running — wait for completion first.
 - Stuck after two tries: stop and say what failed.
 - End every gate message with one line: what you skipped or didn't check, and any risk.
 
@@ -82,9 +84,12 @@ Manual logging (still needed):
 The feedback hook detects corrections, questions, and substantive instructions. Simple
 approvals ("ok", "lgtm", "proceed") are not logged.
 
-Score per ticket = 0.1 × agent-caught + 1.0 × human-caught. Lower is better. An error a
-hook catches costs a tenth of one the user catches, so moving catches from the user to
-the hooks is the main way the flow improves.
+Score per ticket = 0.1 × agent-caught + 1.0 × human-caught + 2.0 × review-caught. Lower is better.
+- **agent-caught**: hooks or self-review found it
+- **human-caught**: user caught it during gates
+- **review-caught**: code review comments from other developers (GitHub PR reviews)
+
+Moving catches earlier (review → human → agent) is how the flow improves.
 
 ## Stages
 
@@ -93,6 +98,8 @@ the hooks is the main way the flow improves.
   previous ticket is still open, ask before `--force`. `start` prints the base commit
   (also kept in `.claude/ticket/state.json`). On a dirty tree it is a snapshot of the
   user's uncommitted work, so that work never counts as part of this ticket.
+- **Load repo rules**: check `${CLAUDE_SKILL_DIR}/references/repo-rules/` for a file
+  matching the repo name. If found, load it — these are hard rules that block the workflow.
 - If the `LSP` tool is unavailable, say once: "No LSP: run
   `/plugin install ruby-lsp@claude-plugins-official` for symbol lookup. Using
   introspection and grep." Continue.
@@ -192,6 +199,21 @@ approves, then `L close` and show the score lines. Commit nothing.
 (ignore `run.jsonl`, which belongs to whatever ticket is open). The bug got past every
 gate, so also ask which gate should have caught it.
 
-When fixing any bug — whether from a bug report or discovered mid-ticket — write a spec
-first that fails with the exact same error from the exact same line, then fix the code.
-The spec must be red for the right reason before any implementation change is made.
+When fixing any bug — whether from a bug report or discovered mid-ticket — follow the
+**Spec-first bug procedure** below.
+
+## Spec-first bug procedure
+
+Before fixing any reported bug or flaw:
+
+1. **Build the mental model**: describe the scenario that breaks the flow. What inputs,
+   what state, what sequence of calls leads to the failure? If you cannot articulate
+   this, you do not understand the bug yet.
+2. **Write the failing spec**: translate that scenario into a spec. It must fail for the
+   exact reason described — same error, same line. If it passes or fails differently,
+   your mental model is wrong; revise it.
+3. **Fix the code**: only after the spec is red for the right reason.
+4. **Verify**: spec turns green, no other specs break.
+
+If you cannot produce a failing spec, say so. Either the scenario is not real, or you
+lack the context to reproduce it — both are useful information.
