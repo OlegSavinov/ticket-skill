@@ -4,9 +4,9 @@ description: >
   Run a ticket end to end in a Rails repo with three human gates and a learning loop:
   explore, assumptions and questions, plan, failing specs first, implement, self-review,
   diff review, then a retro that teaches the flow through a per-repo lesson ledger.
-  Subcommands: bug. For retro/prune/defend, load the corresponding reference file.
+  Subcommands: bug, defend, review. For retro/prune, load the corresponding reference file.
 disable-model-invocation: true
-argument-hint: "<JIRA-KEY | pasted ticket> | bug <KEY> <what broke> | defend [<KEY>]"
+argument-hint: "<JIRA-KEY | pasted ticket> | bug <KEY> <what broke> | defend [<KEY>] | review [self|pr <N>|branch]"
 allowed-tools: Bash(ruby ${CLAUDE_SKILL_DIR}/scripts/*), Write, Edit, MultiEdit
 hooks:
   PostToolUse:
@@ -33,10 +33,11 @@ Arguments: `$ARGUMENTS`
 
 - `bug <KEY> <text>` → Bug.
 - `defend [<KEY>]` → Defend PR (load `references/defend.md`).
+- `review [self|pr <number>|branch [<name>]]` → Review (load `references/review.md`).
 - Anything else is a ticket (Jira key or pasted text): run stages 0–8 in order.
 
-For standalone retro, prune, or defend, load the reference files `references/retro.md`,
-`references/prune.md`, or `references/defend.md` on demand.
+For standalone retro, prune, defend, or review, load the corresponding reference file in
+`references/`.
 
 `L` below means `ruby ${CLAUDE_SKILL_DIR}/scripts/ledger.rb`, run from the repo root.
 State lives in `.claude/ticket/` (git-excluded locally). One session per ticket: the hooks
@@ -177,9 +178,8 @@ Fix what they report. Never disable a cop, skip a spec or edit a check to get pa
 Also run the spec files for affected callers the plan named.
 
 ### 7. Self-review, then gate 3: diff (STOP)
-- Run the `ponytail-review` skill on the diff since base (`git diff <base>` plus new
-  files). Fix every bug and risk it finds, logging each with `L event agent review "<what>"`.
-  Apply simplifications only inside the ticket's scope.
+- Run `review self` (load `references/review.md`) on the diff since base. Fix every
+  must-fix and should-fix item, logging each with `L event agent review "<what>"`.
 - **Check every line in the diff:**
   - Does it bear on the ticket? Remove lines that don't.
   - Is it the minimum code to express the intent? Simplify what isn't.
