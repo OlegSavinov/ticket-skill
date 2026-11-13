@@ -36,7 +36,7 @@ ticket key, branch name, base commit."
 State in ≤5 lines: ticket goal, what the diff changes.
 
 ### 3. Spawn reviewers (parallel)
-Launch three subagents with this shared context:
+Launch four subagents with this shared context:
 ```
 Ticket: <jira text, ≤20 lines>
 Diff: <full diff>
@@ -75,6 +75,30 @@ Review this diff against these criteria:
 8. Overcomplications: unnecessary abstractions, premature optimization, YAGNI violations
 
 Return findings as a numbered list, grouped by category.
+```
+
+**3.4 Waste management** (general-task-execution with `references/waste.md`):
+```
+Review this diff for waste. Goal: same behavior, less code.
+
+Attack vectors:
+1. Redundant paths — multiple ways to same result, collapse them
+2. Verbose expressions — abstractions that don't earn their existence
+3. Dead code — unreachable branches, uncalled methods, impossible conditions
+4. Implicit satisfactions — explicit checks for things already guaranteed
+5. Needless loops — unnecessary traversals, multiple passes, N+1 patterns
+6. Spec consolidation — specs that could merge without losing quality
+
+Focus on changes in the diff, but note adjacent waste discovered while reading.
+Behavior-preserving suggestions only — this is pruning, not refactoring.
+
+Return findings as a numbered list with:
+- Location (file:line)
+- What the waste is (1 line)
+- What to do (1 line)
+- Severity: Cut (remove now), Slim (simplify if cheap), Consider (human judgment)
+
+Max 10 items, prioritize by impact.
 ```
 
 ### 4. Synthesize
