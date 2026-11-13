@@ -11,17 +11,10 @@ description: >
 
 Run stage 8 (Retro) of the ticket workflow only.
 
-`L` below means `ruby $HOME/.kiro/skills/ticket/scripts/ledger.rb`, run from the repo root.
+`L` below means `ruby $HOME/.claude/skills/ticket/scripts/ledger.rb`, run from the repo root.
 
 ## Retro
 
-Read `$HOME/.kiro/skills/ticket/references/ledger.md` and follow its Retro section. Present one
+Read `$HOME/.claude/skills/ticket/references/ledger.md` and follow its Retro section. Present one
 proposal covering ledger entries, promotions and skill edits. Apply only what the user
 approves, then `L close` and show the score lines. Commit nothing.
-
-## Context
-
-This shares state with the main ticket skill:
-- State lives in `.claude/ticket/` (git-excluded locally)
-- Uses the same ledger.rb script and ledger.md reference
-- Operates on the currently open ticket's run.jsonl

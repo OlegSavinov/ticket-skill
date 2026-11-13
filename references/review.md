@@ -2,13 +2,11 @@
 inclusion: manual
 name: ticket-review
 description: >
-  Comprehensive code review using parallel subagents. Compacts context, fetches ticket
-  and diff, spawns three reviewers, synthesizes findings, then fixes or comments.
+  Comprehensive code review using parallel subagents. Fetches ticket
+  and diff, spawns four reviewers, synthesizes findings, then fixes or comments.
 ---
 
 # Review
-
-Comprehensive review using parallel subagents.
 
 ## Arguments
 
@@ -16,17 +14,9 @@ Comprehensive review using parallel subagents.
 - `review pr <number>` — review external PR, post comments
 - `review branch [<branch>]` — review local branch diff against main
 
-## Working style
-
-Same as ticket skill: terse, no fluff. Focus on what matters.
-
 ## Stages
 
-### 1. Compact
-Request context compaction with instruction: "Preparing for code review. Preserve:
-ticket key, branch name, base commit."
-
-### 2. Fetch context
+### 1. Fetch context
 - **Jira ticket**: fetch with comments and linked issues (or use cached from current session)
 - **Diff**: 
   - Self/branch: `git diff <base>` (base from `.claude/ticket/state.json` or main)
@@ -35,7 +25,7 @@ ticket key, branch name, base commit."
 
 State in ≤5 lines: ticket goal, what the diff changes.
 
-### 3. Spawn reviewers (parallel)
+### 2. Spawn reviewers (parallel)
 Launch four subagents with this shared context:
 ```
 Ticket: <jira text, ≤20 lines>
@@ -43,82 +33,58 @@ Diff: <full diff>
 Repo rules: <from repo-rules/ if exists>
 ```
 
-**3.1 Ponytail review** (load `ponytail-review` skill):
+**2.1 Ponytail review** (load `ponytail-review` skill):
 ```
 Run ponytail-review on this diff. Return findings as a numbered list.
-Focus: logic correctness, safety, load handling, test coverage, unnecessary code.
 ```
 
-**3.2 Code review** (load `code-review` skill):
+**2.2 Code review** (load `code-review` skill):
 ```
 Run code-review skill on this diff. Return findings as a numbered list with file:line references.
 ```
 
-**3.3 Constraint review** (general-task-execution):
+**2.3 Constraint review** (general subagent):
 ```
 Review this diff against these criteria:
 
 1. Hard constraints: check repo rules violations
 2. Ticket completeness: compare each acceptance criterion from the Jira ticket against
    the implementation. Flag any criterion that isn't covered or is implemented
-   differently than specified.
+   differently than specified. Each criterion needs a spec.
 3. Validation/business logic: for any validation or business logic changes, state the
    rule in plain English, then trace every branch in the code to confirm it matches.
    "When X and Y are configured, the code does Z" — verify Z is correct per the ticket.
-4. Comment hygiene: no explanatory comments on obvious code. Comments like
-   "# User is explicitly setting status" restate what the code says. Delete them.
-   Comments are for *why*, not *what*.
+4. Comment hygiene: flag comments that restate the code (e.g.
+   "# User is explicitly setting status"). Comments are for *why*, not *what*.
 5. Execution cleanness: no debug code, commented code, or temp fixes
-6. Ticket skill guidelines: smallest complete change, reuses existing code, specs for
-   each criterion
-7. Logic sense: does the approach make sense for the problem?
-8. Overcomplications: unnecessary abstractions, premature optimization, YAGNI violations
+6. Logic sense: does the approach make sense for the problem?
 
 Return findings as a numbered list, grouped by category.
 ```
 
-**3.4 Waste management** (general-task-execution with `references/waste.md`):
+**2.4 Waste management** (general subagent):
 ```
-Review this diff for waste. Goal: same behavior, less code.
-
-Attack vectors:
-1. Redundant paths — multiple ways to same result, collapse them
-2. Verbose expressions — abstractions that don't earn their existence
-3. Dead code — unreachable branches, uncalled methods, impossible conditions
-4. Implicit satisfactions — explicit checks for things already guaranteed
-5. Needless loops — unnecessary traversals, multiple passes, N+1 patterns
-6. Spec consolidation — specs that could merge without losing quality
-
-Focus on changes in the diff, but note adjacent waste discovered while reading.
-Behavior-preserving suggestions only — this is pruning, not refactoring.
-
-Return findings as a numbered list with:
-- Location (file:line)
-- What the waste is (1 line)
-- What to do (1 line)
-- Severity: Cut (remove now), Slim (simplify if cheap), Consider (human judgment)
-
-Max 10 items, prioritize by impact.
+Read <skill dir>/references/waste_management.md and review this diff by it.
 ```
 
-### 4. Synthesize
-Collect all findings. Select the most important using judgment:
+### 3. Synthesize
+Collect all findings. Classify:
 - **Must fix**: bugs, security, data loss risks, broken functionality
 - **Should fix**: performance issues, missing edge cases, guideline violations
 - **Nit**: style, minor simplifications, nice-to-haves
 
 Deduplicate overlapping findings. Present as one prioritized list (≤15 items).
 
-### 5. Act
+### 4. Act
 
-**5.1 Self-review** (`review` or `review self` or `review branch`):
+**4.1 Self-review** (`review` or `review self` or `review branch`):
 - Fix each must-fix and should-fix item
 - Log fixes: `L event agent review "<what>"`
 - For contested items, use the **Spec-first bug procedure**: if you can't write a failing
   spec for the claimed bug, note it as "could not reproduce"
 - After fixes, re-run affected specs
 
-**5.2 External PR** (`review pr <number>`):
+**4.2 External PR** (`review pr <number>`):
 - Post findings as PR review comments
 - Prefix each comment with `🤖` 
 - Group related findings into single comments where sensible
@@ -130,7 +96,7 @@ Deduplicate overlapping findings. Present as one prioritized list (≤15 items).
   ```
 - For must-fix items, request changes; otherwise comment only
 
-### 6. Report
+### 5. Report
 End with:
 - Findings addressed (count)
 - Findings skipped with reason

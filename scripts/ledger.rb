@@ -5,6 +5,7 @@
 #   event agent|human|review SOURCE TEXT   log a caught error
 #   close                     write metrics to log.yml, deactivate hooks
 #   bug KEY TEXT              add a post-merge bug (human-caught) to KEY
+#   review KEY TEXT           add a conceded PR review comment (review-caught) to KEY
 #   score                     last 10 tickets + rolling average
 #   show [PATH...]            active lessons, filtered by area prefix
 #   stale                     lessons whose refs no longer exist
@@ -81,17 +82,23 @@ when "close"
   File.delete(RUN) if File.exist?(RUN)
   puts "closed #{entry['ticket']}: agent #{entry['agent']}, human #{entry['human']}, review #{entry['review']}, score #{entry['score']}"
   print_scores(log)
-when "bug"
+when "bug", "review"
   key = ARGV.shift
   text = ARGV.join(" ")
-  abort "usage: bug KEY TEXT" if key.nil? || text.empty?
-  log = H.read_yaml(LOG, [])
-  entry = log.reverse.find { |e| e["ticket"] == key } or abort "no closed ticket #{key} in log"
-  entry["human"] += 1
-  entry["score"] = H.score(entry["agent"], entry["human"])
-  (entry["post_merge"] ||= []) << text
-  H.write_yaml(LOG, log)
-  puts "#{key}: human #{entry['human']}, score #{entry['score']}"
+  abort "usage: #{cmd} KEY TEXT" if key.nil? || text.empty?
+  kind, list = cmd == "bug" ? %w[human post_merge] : %w[review review_events]
+  if cmd == "review" && (H.read_json(STATE, nil) || {})["ticket"] == key
+    H.log_event(ROOT, "review", "pr", text) # ticket still open: counted at close
+    puts "logged review/pr"
+  else
+    log = H.read_yaml(LOG, [])
+    entry = log.reverse.find { |e| e["ticket"] == key } or abort "no closed ticket #{key} in log"
+    entry[kind] = (entry[kind] || 0) + 1
+    entry["score"] = H.score(entry["agent"], entry["human"], entry["review"] || 0)
+    (entry[list] ||= []) << text
+    H.write_yaml(LOG, log)
+    puts "#{key}: #{kind} #{entry[kind]}, score #{entry['score']}"
+  end
 when "score"
   print_scores(H.read_yaml(LOG, []))
 when "show"

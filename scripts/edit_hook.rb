@@ -1,5 +1,5 @@
 # PostToolUse hook (Edit|Write): on lines changed during this ticket, run
-#   1. promoted checks from .claude/ticket/checks.yml (any file type)
+#   1. promoted checks from .claude/ticket/checks.yml and the skill's repo-rules/<repo>.yml
 #   2. RuboCop (.rb/.rake, only if the project has RuboCop)
 # Exit 2 feeds findings back to Claude. No-op without an active ticket.
 require_relative "hooklib"
@@ -38,8 +38,14 @@ rescue Psych::SyntaxError => e
               "Tell the user at the next gate; don't fix it yourself."
   []
 end
+# Rules shipped with the skill for this repo.
+checks += H.read_yaml(File.expand_path("../references/repo-rules/#{File.basename(root)}.yml", __dir__), [])
 unless checks.empty?
-  hits = H.check_violations(checks, rel, File.readlines(file), lines)
+  resp = input["tool_response"]
+  # shortcut: without a Write result type, any Write to an untracked file counts as a
+  # create; upgrade to a PreToolUse hook if generated-then-rewritten files get flagged.
+  created = input["tool_name"] == "Write" && !tracked && !(resp.is_a?(Hash) && resp["type"] == "update")
+  hits = H.path_violations(checks, rel, created) + H.check_violations(checks, rel, File.readlines(file), lines)
   unless hits.empty?
     H.log_event(root, "agent", "check", "#{rel}: #{hits.size} promoted-check hit(s)")
     findings << "Promoted checks (lessons from past tickets):\n" + hits.join("\n")

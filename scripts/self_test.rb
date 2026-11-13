@@ -82,11 +82,25 @@ check("check_violations skips non-matching paths and bad regex") do
     H.check_violations([{ "id" => "B", "pattern" => "(" }], "app/x.rb", SRC, nil).empty?
 end
 
+RULES = [
+  { "id" => "R-1", "paths" => "spec/fixtures/files/production.crontab", "message" => "generated" },
+  { "id" => "R-2", "paths" => "db/", "only" => "create", "message" => "use the generator" }
+]
+check("path rule flags any edit under its path") { H.path_violations(RULES, "spec/fixtures/files/production.crontab", false).size == 1 }
+check("create-only path rule ignores edits, flags new files") do
+  H.path_violations(RULES, "db/schema.rb", false).empty? && H.path_violations(RULES, "db/migrate/1_x.rb", true).size == 1
+end
+check("check_violations ignores path rules") { H.check_violations(RULES, "db/schema.rb", SRC, nil).empty? }
+check("shipped repo rules parse as path rules") do
+  Dir[File.expand_path("../references/repo-rules/*.yml", __dir__)].all? { |p| H.read_yaml(p, []).all? { |c| c["id"] && c["paths"] && c["message"] } }
+end
+
 # --- scoring
 check("score weights agent 0.1, human 1.0") { H.score(3, 2) == 2.3 }
+check("score weights review 2.0") { H.score(3, 2, 1) == 4.3 }
 check("summarize counts events by kind") do
   ev = [{ "kind" => "agent" }, { "kind" => "agent" }, { "kind" => "human" }, { "kind" => "other" }]
-  H.summarize(ev) == { "agent" => 2, "human" => 1, "score" => 1.2 }
+  H.summarize(ev) == { "agent" => 2, "human" => 1, "review" => 0, "score" => 1.2 }
 end
 check("rolling averages the last n") { H.rolling([10, 1, 2, 3], 3) == 2.0 }
 check("rolling of nothing is nil") { H.rolling([], 10).nil? }

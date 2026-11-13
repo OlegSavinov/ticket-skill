@@ -14,7 +14,12 @@ ticket → explore (subagent) → GATE 1 assumptions & questions → GATE 2 plan
 git clone git@github.com:OlegSavinov/ticket-skill.git ~/.claude/skills/ticket
 ```
 
-The path matters: the hooks call `~/.claude/skills/ticket/scripts/`.
+The path matters: the hooks and reference files call `~/.claude/skills/ticket/`. For Kiro,
+link it rather than cloning twice:
+
+```sh
+ln -s ~/.claude/skills/ticket ~/.kiro/skills/ticket
+```
 
 Optional, for symbol lookup instead of grep:
 
@@ -35,6 +40,8 @@ project already has it (`bin/rubocop` or in `Gemfile.lock`).
 | `/ticket retro` | Rerun the retro for the open ticket |
 | `/ticket prune` | Retire stale lessons, merge duplicates, report the score trend |
 | `/ticket bug PROJ-123 <what broke>` | Log a post-merge bug and run a retro on it |
+| `/ticket defend [PROJ-123]` | Address PR review comments |
+| `/ticket review [self\|pr N\|branch]` | Review a diff with four parallel reviewers |
 
 Use one Claude Code session per ticket. Once the skill runs, its hooks stay on for the
 rest of the session, and they do nothing unless a ticket is open.
@@ -50,26 +57,16 @@ rest of the session, and they do nothing unless a ticket is open.
 
 ## How it learns
 
-Every correction is logged with a cause from a fixed list, and the cause decides where the
-fix goes:
+Every correction is logged with a cause from a fixed list. At the retro each lesson
+graduates to the strongest fix that would have prevented it: a skill instruction, a check
+the hook enforces, the exploration method, or a note for your ticket template.
+Repo-specific facts stay as lessons.
 
-| Cause | Fix goes to |
-|---|---|
-| `missing_knowledge` | a lesson |
-| `explore_miss` | a lesson, then the exploration method if it repeats |
-| `spec_gap` | your ticket template |
-| `ignored_instruction` | a promoted check (the text already failed) |
-| `ambiguous_instruction` | reworded lesson or skill text |
-| `no_verification` | a check or a spec |
-| `wrong_judgment` | the plan checklist |
-
-- The same lesson seen on 2+ tickets becomes a check the hook enforces.
-- The same cause behind 3+ lessons triggers a change to that stage of the flow.
 - You approve every change. Nothing edits itself unchecked.
 
-**Score per ticket = 0.1 × agent-caught + 1.0 × human-caught**, with a rolling average over
-the last 10 tickets. Lower is better. Moving catches from you to the hooks is the main way
-the flow improves.
+**Score per ticket = 0.1 × agent-caught + 1.0 × human-caught + 2.0 × review-caught**, with a
+rolling average over the last 10 tickets. Lower is better. Moving catches earlier
+(reviewers → you → hooks) is how the flow improves.
 
 ## Per-repo state
 
@@ -85,6 +82,12 @@ nothing is touched), so your own work never counts as the agent's.
 SKILL.md               the flow, gates, working style, hooks (frontmatter)
 references/rails.md    lookup order: LSP → Rails introspection → grep; old-app traps
 references/ledger.md   schemas, cause table, retro and prune procedures
+references/review.md   four-reviewer code review; waste_management.md is one reviewer's brief
+references/defend.md   answering PR review comments
+references/non-code.md research and decision tickets
+references/repo-rules/ hard rules per repo; <repo>.yml is enforced by the edit hook
+references/retro.md, prune.md   Kiro entry points into ledger.md
+scripts/feedback_hook.rb  UserPromptSubmit hook
 scripts/hooklib.rb     pure logic shared by hooks and ledger
 scripts/edit_hook.rb   PostToolUse hook
 scripts/specs_hook.rb  Stop hook

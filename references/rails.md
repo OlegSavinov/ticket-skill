@@ -3,10 +3,7 @@
 Use this order and stop as soon as you have the answer.
 
 ## 1. LSP tool (if available)
-- `workspaceSymbol`: find a class or method by name.
-- `goToDefinition` / `findReferences`: follow a call; find every caller.
-- `documentSymbol`: a file's outline without reading the file.
-- `hover`: signature and docs at a position.
+Symbol search, definitions, references and file outlines, instead of reading files.
 
 Static analysis misses code Rails generates at runtime, which is what step 2 covers.
 
@@ -35,9 +32,7 @@ bin/rails runner '
   `db/structure.sql` instead of `schema.rb`.
 
 ## 3. grep / git grep
-Rails naming is predictable: `OrdersController` lives in
-`app/controllers/orders_controller.rb`, and `Billing::Charge` in `app/*/billing/charge.rb`.
-Also look in `lib/`, `app/*/concerns/`, engines (`engines/`, `components/`) and gems the
+Beyond `app/`, look in `lib/`, `app/*/concerns/`, engines (`engines/`, `components/`) and gems the
 Gemfile loads with `path:`.
 
 ## Traps in old apps

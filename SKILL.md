@@ -4,9 +4,9 @@ description: >
   Run a ticket end to end in a Rails repo with three human gates and a learning loop:
   explore, assumptions and questions, plan, failing specs first, implement, self-review,
   diff review, then a retro that teaches the flow through a per-repo lesson ledger.
-  Subcommands: bug, defend, review. For retro/prune, load the corresponding reference file.
+  Subcommands: bug, defend, review, retro, prune.
 disable-model-invocation: true
-argument-hint: "<JIRA-KEY | pasted ticket> | bug <KEY> <what broke> | defend [<KEY>] | review [self|pr <N>|branch]"
+argument-hint: "<JIRA-KEY | pasted ticket> | bug <KEY> <what broke> | defend [<KEY>] | review [self|pr <N>|branch] | retro | prune"
 allowed-tools: Bash(ruby ${CLAUDE_SKILL_DIR}/scripts/*), Write, Edit, MultiEdit
 hooks:
   PostToolUse:
@@ -34,10 +34,9 @@ Arguments: `$ARGUMENTS`
 - `bug <KEY> <text>` → Bug.
 - `defend [<KEY>]` → Defend PR (load `references/defend.md`).
 - `review [self|pr <number>|branch [<name>]]` → Review (load `references/review.md`).
+- `retro` → stage 8 only. `prune` → the Prune section of `references/ledger.md`.
 - Anything else is a ticket (Jira key or pasted text): run stages 0–8 in order.
-
-For standalone retro, prune, defend, or review, load the corresponding reference file in
-`references/`.
+- A non-code ticket (research, decision): also load `references/non-code.md`.
 
 `L` below means `ruby ${CLAUDE_SKILL_DIR}/scripts/ledger.rb`, run from the repo root.
 State lives in `.claude/ticket/` (git-excluded locally). One session per ticket: the hooks
@@ -50,7 +49,6 @@ Applies to every stage and goes, condensed, into every subagent brief.
 
 - Lazy about the method, never about the result: least effort, fewest words, least new
   code, never at the cost of correctness.
-- Always look for an opportunity to produce less: concise responses, keywords as a comment.
 - Work priority: delete -> extend -> create. Never at a cost of code quality and readabilty.
 - Lead with the result. Short sentences, everyday words. A list or table only when it is
   shorter than prose. One recommendation, not a survey.
@@ -70,7 +68,7 @@ Applies to every stage and goes, condensed, into every subagent brief.
   `# shortcut: <the limit>, <when to upgrade>`.
 - Never cut validation at trust boundaries, error handling that prevents data loss,
   security, or anything the ticket asks for.
-- Never commit, push or rewrite git history. Confirm before anything destructive.
+- Commit, push or open a PR only when the user asks. Never rewrite git history.
 - Always run `git commit` as a standalone command, never chained with other tool calls in the same response. Only commit once the code is verified safe and all edits are complete — hooks must run cleanly on the final state, not on a partially-modified file.
 - Never launch a command that touches the DB while a previous one is still running — wait for completion first.
 - Stuck after two tries: stop and say what failed.
@@ -78,16 +76,10 @@ Applies to every stage and goes, condensed, into every subagent brief.
 
 ## Logging caught errors
 
-The hooks log catches automatically:
-- **Edit hook**: promoted checks and RuboCop violations on changed lines → `agent`
-- **Specs hook**: failing specs → `agent`
-- **Feedback hook**: user corrections/instructions at gates → `human`
-
-Manual logging (still needed):
-- `L event agent review "<what>"`: issues your self-review (stage 7) catches and fixes.
-
-The feedback hook detects corrections, questions, and substantive instructions. Simple
-approvals ("ok", "lgtm", "proceed") are not logged.
+The hooks log their own catches: the edit and specs hooks as `agent`, the feedback hook
+as `human` (user messages that match correction keywords).
+Log by hand only `L event agent review "<what>"`: each issue self-review (stage 7)
+catches and fixes.
 
 Score per ticket = 0.1 × agent-caught + 1.0 × human-caught + 2.0 × review-caught. Lower is better.
 - **agent-caught**: hooks or self-review found it
@@ -118,7 +110,7 @@ Moving catches earlier (review → human → agent) is how the flow improves.
   conversation. Decisions often live outside the description.
 - Every requirement the user stated goes into the criteria. Never move one into
   non-goals or "later" yourself; if it looks out of scope, ask at gate 1.
-- Anything missing or vague becomes a gate 1 question. Don't pad.
+- Anything missing or vague becomes a gate 1 question.
 
 ### 2. Explore (subagent)
 Run `L show` for the repo's active lessons. Spawn one Explore subagent with this brief:
@@ -127,9 +119,8 @@ Run `L show` for the repo's active lessons. Spawn one Explore subagent with this
 Find the code for this ticket in a Rails repo. Do not edit anything.
 Ticket: <extracted ticket>
 Known lessons for this repo (trust these over what the code seems to say): <L show output>
-Method: read ${CLAUDE_SKILL_DIR}/references/rails.md and follow its lookup order
-(LSP tool, then Rails introspection, then grep). Prefer symbol lookups over reading
-whole files. Read only what answers the questions below.
+Method: read ${CLAUDE_SKILL_DIR}/references/rails.md and follow its lookup order.
+Read only what answers the questions below.
 Style: lazy about the method, never about the result. Terse.
 Return at most 60 lines:
 - entry points and the code path, as path:line
@@ -150,8 +141,7 @@ Run `L gate assumptions` to mark the current gate.
 - **Unsettled edge cases**: each with what you'd do by default.
 - Skipped/risk line.
 
-Wait for the answer. The feedback hook logs user corrections automatically. Keep answers
-that are lasting domain facts for the retro.
+Wait for the answer. Keep answers that are lasting domain facts for the retro.
 
 ### 4. Gate 2: plan (STOP)
 Run `L gate plan` to mark the current gate. Enter plan mode. First describe the intended flow:
@@ -165,7 +155,7 @@ The plan:
 - Specs to add or change, each mapped to an acceptance criterion.
 - Risks, and what is out of scope.
 
-Wait for approval. The feedback hook logs user corrections automatically.
+Wait for approval.
 
 ### 5. Failing specs first
 Write specs for each criterion. Extend existing spec files and factories in their style.
@@ -173,30 +163,22 @@ Run them (`bundle exec rspec <files>`). Each must fail for the right reason, mis
 behavior, not a load, factory or syntax error. Fix the setup until that's true.
 
 ### 6. Implement
-Make the smallest complete change that turns the specs green. The hooks enforce:
-- after each edit: promoted checks and RuboCop, on the lines you changed only;
-- on every stop: the specs mapped from changed files (blocks up to 3 times, then hands
-  back to the user).
-
-Fix what they report. Never disable a cop, skip a spec or edit a check to get past them.
+Make the smallest complete change that turns the specs green. Fix what the hooks report.
+Never disable a cop, skip a spec or edit a check to get past them.
 Also run the spec files for affected callers the plan named.
 
 ### 7. Self-review, then gate 3: diff (STOP)
-- Run `review self` (load `references/review.md`) on the diff since base. Fix every
-  must-fix and should-fix item, logging each with `L event agent review "<what>"`.
-- **Check every line in the diff:**
-  - Does it bear on the ticket? Remove lines that don't.
-  - Is it the minimum code to express the intent? Simplify what isn't.
+- Run `review self` (load `references/review.md`) on the diff since base.
 - Run `L gate review` to mark the current gate.
 - Gate message: `git diff --stat <base>`, what changed in at most 10 lines, each criterion
   with its spec (all green), the review verdict, the skipped/risk line.
 
-Wait. The feedback hook logs user corrections automatically. Apply fixes and return to this gate.
+Wait. Apply fixes and return to this gate.
 
 ### 8. Retro
 Read `${CLAUDE_SKILL_DIR}/references/ledger.md` and follow its Retro section. Present one
 proposal covering ledger entries, promotions and skill edits. Apply only what the user
-approves, then `L close` and show the score lines. Commit nothing.
+approves, then `L close` and show the score lines.
 
 ## Bug
 `L bug <KEY> "<what broke>"`. Then run the Retro section with the bug as its only event
@@ -208,7 +190,7 @@ When fixing any bug — whether from a bug report or discovered mid-ticket — f
 
 ## Creating PRs
 
-Two-step process to preserve the repo's PR template:
+When the user asks for a PR, two steps preserve the repo's PR template:
 
 1. **Create with template**: `gh pr create --title "KEY: description" --fill`
    - Never pass `--body` on create — it overwrites the template

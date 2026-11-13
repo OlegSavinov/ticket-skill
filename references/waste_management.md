@@ -10,11 +10,6 @@ description: >
 
 Attack vector for code review. Goal: keep the codebase lean. Same behavior, less code.
 
-## Philosophy
-
-Every line has carrying cost: cognitive load, maintenance burden, test surface, bug habitat.
-Code that doesn't earn its place should go. The best diff removes more than it adds.
-
 ## Attack vectors
 
 ### 1. Redundant paths — do same with less
@@ -108,12 +103,8 @@ For each finding:
 - **Slim**: verbose but functional — simplify if touch is cheap
 - **Consider**: potential consolidation — flag for human judgment
 
-## Integration with review
+## Scope
 
-When spawned as part of the review stage:
-- Receive: diff, ticket context, repo rules
-- Return: findings list (max 10 items, prioritize by impact)
-- Focus on *changes in the diff* but note adjacent waste discovered while reading
-
-Do not propose rewrites that change behavior. This is waste management, not refactoring.
-Behavior-preserving only.
+Focus on changes in the diff, but note adjacent waste found while reading. Max 10
+findings, prioritized by impact. Behavior-preserving only: this is waste management,
+not refactoring.

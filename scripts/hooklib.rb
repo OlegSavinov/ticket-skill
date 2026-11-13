@@ -111,6 +111,7 @@ module TicketHooks
   def check_violations(checks, rel, file_lines, lines)
     out = []
     checks.each do |c|
+      next unless c["pattern"] # path rule, see path_violations
       next if c["paths"] && !rel.start_with?(c["paths"])
       re = begin
         Regexp.new(c["pattern"].to_s)
@@ -123,6 +124,13 @@ module TicketHooks
       end
     end
     out
+  end
+
+# A check with no pattern is a path rule: any edit under `paths` is a violation;
+  # `only: create` limits it to files created by this edit.
+  def path_violations(checks, rel, created)
+    checks.select { |c| c["pattern"].nil? && c["paths"] && rel.start_with?(c["paths"]) && (c["only"] != "create" || created) }
+          .map { |c| "#{rel} [#{c['id']}] #{c['message']}" }
   end
 
   # --- scoring ----------------------------------------------------------------

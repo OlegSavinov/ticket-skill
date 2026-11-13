@@ -1,0 +1,8 @@
+# Path rules the edit hook enforces in the financeit repo (schema: references/ledger.md).
+- id: R-1
+  paths: spec/fixtures/files/production.crontab
+  message: "generated file, never hand-edit: revert it; after config/schedule.rb changes run RERECORD=1 rspec spec/whenever_spec.rb"
+- id: R-2
+  paths: db/
+  only: create
+  message: "never create files in db/ by hand: delete it and use `rails generate migration`"
