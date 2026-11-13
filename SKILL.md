@@ -60,6 +60,10 @@ Applies to every stage and goes, condensed, into every subagent brief.
   RuboCop fixes. Name a useful extra in one line instead of doing it.
 - Smallest complete change: reuse what the codebase has (helpers, concerns, service
   patterns), then Ruby/Rails, then installed gems. Never add a gem for a few lines.
+- Services take models, return models: prefer high-level domain objects (ActiveRecord
+  models, value objects) over primitives or hashes as inputs and outputs. A service that
+  takes `(user, loan)` is easier to follow than one that takes `(user_id, loan_id, status,
+  amount)`. The signature should read like the business operation it performs.
 - Finish everything the change needs: grep every caller of what you touch, update specs,
   factories and fixtures. Fix root causes once, in the shared code.
 - Comment only the why the code can't show. A shortcut with a known limit gets
@@ -201,6 +205,17 @@ gate, so also ask which gate should have caught it.
 
 When fixing any bug — whether from a bug report or discovered mid-ticket — follow the
 **Spec-first bug procedure** below.
+
+## Creating PRs
+
+Two-step process to preserve the repo's PR template:
+
+1. **Create with template**: `gh pr create --title "KEY: description" --fill`
+   - Never pass `--body` on create — it overwrites the template
+
+2. **Fill in template**: `gh pr edit <number> --body '...'`
+   - Fill in JIRA link, Summary bullets
+   - Keep ALL checkboxes — check only what applies, never delete lines
 
 ## Spec-first bug procedure
 
